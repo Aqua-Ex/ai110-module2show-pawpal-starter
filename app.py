@@ -185,6 +185,40 @@ if st.session_state.pet and st.session_state.pet.tasks:
         low_tasks = st.session_state.pet.get_tasks_by_priority(Priority.LOW)
         st.metric("Low Priority", len(low_tasks))
 
+    # Task filtering view
+    with st.expander("🔍 Filter & Sort Tasks", expanded=False):
+        filter_option = st.selectbox(
+            "Show tasks:",
+            ["All Tasks", "Completed Tasks", "Incomplete Tasks", "High Priority", "Medium Priority", "Low Priority"]
+        )
+
+        if filter_option == "Completed Tasks":
+            filtered = st.session_state.pet.get_completed_tasks()
+        elif filter_option == "Incomplete Tasks":
+            filtered = st.session_state.pet.get_incomplete_tasks()
+        elif filter_option == "High Priority":
+            filtered = st.session_state.pet.get_tasks_by_priority(Priority.HIGH)
+        elif filter_option == "Medium Priority":
+            filtered = st.session_state.pet.get_tasks_by_priority(Priority.MEDIUM)
+        elif filter_option == "Low Priority":
+            filtered = st.session_state.pet.get_tasks_by_priority(Priority.LOW)
+        else:
+            filtered = st.session_state.pet.tasks
+
+        if filtered:
+            task_table = []
+            for task in filtered:
+                task_table.append({
+                    "Task": task.title,
+                    "Duration": f"{task.duration_minutes} min",
+                    "Priority": task.priority.value.title(),
+                    "Status": "✅ Done" if task.last_done else "⏳ Pending",
+                    "Recurrence": task.recurrence.value.replace("_", " ").title()
+                })
+            st.table(task_table)
+        else:
+            st.info(f"No tasks found for filter: {filter_option}")
+
 elif st.session_state.tasks:
     st.write("Current tasks (not yet assigned to a pet):")
     st.table(st.session_state.tasks)
@@ -289,6 +323,23 @@ if st.button("Generate schedule"):
             # Display results
             st.success("✅ Schedule generated successfully!")
 
+            # Check for scheduling conflicts/warnings
+            if scheduler.has_warnings():
+                st.warning("⚠️ **Scheduling Conflicts Detected**")
+                st.markdown("Some tasks overlap in time. Consider adjusting task durations or extending your availability window.")
+
+                with st.expander("📋 View Conflict Details", expanded=True):
+                    for warning in scheduler.get_warnings():
+                        st.warning(warning)
+
+                    st.markdown("**💡 Suggestions:**")
+                    st.markdown("""
+                    - Reduce the duration of lower-priority tasks
+                    - Add more availability windows throughout the day
+                    - Mark some tasks as optional (lower priority)
+                    - Reschedule conflicting tasks to different days
+                    """)
+
             # Show schedule summary
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -301,20 +352,79 @@ if st.button("Generate schedule"):
             # Display scheduled tasks
             if schedule.scheduled_tasks:
                 st.subheader("📅 Your Daily Schedule")
-                for st_task in schedule.scheduled_tasks:
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.markdown(f"**{st_task.task.title}**")
-                            st.caption(f"{st_task.start_time.strftime('%I:%M %p')} - {st_task.end_time.strftime('%I:%M %p')} • {st_task.reason}")
-                        with col2:
-                            st.info(f"{st_task.task.duration_minutes} min")
+
+                # Create a table view option
+                view_mode = st.radio(
+                    "View mode:",
+                    ["Detailed Cards", "Compact Table"],
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+
+                if view_mode == "Detailed Cards":
+                    for st_task in schedule.scheduled_tasks:
+                        # Add recurring indicator
+                        recurring_badge = ""
+                        if st_task.task.recurrence != RecurrencePattern.AS_NEEDED:
+                            recurring_badge = f" 🔄 {st_task.task.recurrence.value.replace('_', ' ').title()}"
+
+                        with st.container():
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.markdown(f"**{st_task.task.title}**{recurring_badge}")
+                                st.caption(f"{st_task.start_time.strftime('%I:%M %p')} - {st_task.end_time.strftime('%I:%M %p')} • {st_task.reason}")
+                            with col2:
+                                st.info(f"{st_task.task.duration_minutes} min")
+                else:
+                    # Compact table view
+                    table_data = []
+                    for st_task in schedule.scheduled_tasks:
+                        recurring_indicator = ""
+                        if st_task.task.recurrence != RecurrencePattern.AS_NEEDED:
+                            recurring_indicator = " 🔄"
+
+                        table_data.append({
+                            "Time": f"{st_task.start_time.strftime('%I:%M %p')} - {st_task.end_time.strftime('%I:%M %p')}",
+                            "Task": st_task.task.title + recurring_indicator,
+                            "Duration": f"{st_task.task.duration_minutes} min",
+                            "Priority": st_task.task.priority.value.title(),
+                            "Recurrence": st_task.task.recurrence.value.replace("_", " ").title(),
+                            "Reason": st_task.reason
+                        })
+                    st.table(table_data)
 
             # Display unscheduled tasks
             if schedule.unscheduled_tasks:
                 st.subheader("⚠️ Could Not Schedule")
-                for task in schedule.unscheduled_tasks:
-                    st.warning(f"**{task.title}** ({task.duration_minutes} min, {task.priority.value} priority)")
+                st.caption(f"{len(schedule.unscheduled_tasks)} task(s) didn't fit in your availability window")
+
+                # Group by priority for better visibility
+                high_unscheduled = [t for t in schedule.unscheduled_tasks if t.priority == Priority.HIGH]
+                medium_unscheduled = [t for t in schedule.unscheduled_tasks if t.priority == Priority.MEDIUM]
+                low_unscheduled = [t for t in schedule.unscheduled_tasks if t.priority == Priority.LOW]
+
+                if high_unscheduled:
+                    st.warning("**🔴 High Priority Tasks Not Scheduled:**")
+                    for task in high_unscheduled:
+                        st.markdown(f"- **{task.title}** ({task.duration_minutes} min)")
+
+                if medium_unscheduled:
+                    st.info("**🟡 Medium Priority Tasks Not Scheduled:**")
+                    for task in medium_unscheduled:
+                        st.markdown(f"- {task.title} ({task.duration_minutes} min)")
+
+                if low_unscheduled:
+                    st.info("**🟢 Low Priority Tasks Not Scheduled:**")
+                    for task in low_unscheduled:
+                        st.markdown(f"- {task.title} ({task.duration_minutes} min)")
+
+                st.markdown("**💡 To fit more tasks:**")
+                st.markdown("""
+                - Extend your availability window (add more hours)
+                - Reduce task durations where possible
+                - Lower the priority of less important tasks
+                - Split tasks across multiple days
+                """)
 
             # Show explanation
             with st.expander("🤔 How was this schedule created?"):
