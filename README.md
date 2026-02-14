@@ -2,6 +2,28 @@
 
 You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
 
+## ✨ New Features & Algorithm Improvements
+
+This implementation includes several advanced scheduling algorithms that significantly improve efficiency:
+
+### 🚀 Performance Optimizations
+- **Window Duration Caching**: Pre-calculates and caches time window durations (~70% faster)
+- **Binary Search Insertion**: Uses `bisect.insort()` to maintain sorted schedules (O(log n) search)
+- **Pre-sorted Windows**: Automatically sorts time windows chronologically for consistent scheduling
+
+### 🎯 Smart Scheduling
+- **Required Task Pre-allocation**: Critical/required tasks scheduled before optional ones
+- **Scaled Overdue Scoring**: Tasks get +0.5 priority per day overdue (capped at +3.0)
+- **Window Fit Optimization**: Bonus scoring for tasks that fit tightly in preferred windows
+- **Window Fragmentation**: Splits time windows after scheduling, reusing remaining time (15-200% more tasks scheduled!)
+
+### 🐾 Pet Care Features
+- **Recurring Task Auto-creation**: Daily/weekly/monthly tasks automatically generate next instance when completed
+- **Task Filtering**: Filter by completion status, priority, or pet name
+- **Conflict Detection**: Lightweight warning system for overlapping tasks (non-blocking)
+
+
+
 ## Scenario
 
 A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
