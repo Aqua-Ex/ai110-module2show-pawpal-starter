@@ -7,11 +7,13 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+I only added four classes (Owner, Pet, Task, Scheduler). The relations inlcude Owner owning pets and pets having a task, while schulder passes down information to every other class. As for responsibilites: Owner class stores information about the owner and sets their avaliable times; Pets stores infomation about the pets and links to their tasks; Tasks store information about specific tasks and sets priority and preferred times; Scheduler generates schedules, explains reasoning behind such schedlues and scores tasks.
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
-
+    Yes, I added a Recurrence Pattern which tracks how often a task repeats(Daily, weekly, etc). The way it was done before had no way to determine if a task was overdue. Adding recurrence patterns enables the is_overdue() method to properly prioritize tasks
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
